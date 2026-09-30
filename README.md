@@ -51,10 +51,10 @@ Overlap policy, concurrency, atomic multi-save recovery, full email syntax valid
 
 Work individually. Author your own tests, implementation choices, and explanation. Do not copy another student's code or submit a shared repair.
 
-1. Record the baseline command, revision, and results. Inspect tests and supporting doubles/setup before editing.
-2. Repair weaknesses in boundary/state coverage, assertions and invariants, setup ownership, doubles, persistence evidence, and test maintainability. Use facts and theories intentionally. Keep the suite compact and readable, with focused lifecycle unit tests and one intentional SQLite lifecycle component scenario.
-3. Demonstrate that repaired tests work individually and together, without relying on execution order. Keep databases and mutable test state owned by the tests that use them.
-4. Complete `docs/test-review.md` with diagnosis, reasoning, evidence, and remaining limitations. Explain what your doubles prove and what your component test proves. Include one concrete example of a behavior error your repaired assertions would detect that the starter could miss.
+1. Before editing, confirm that `main` is clean and record the starting commit, execution environment, .NET version, baseline command, and pass/fail/skip counts. Inspect tests and supporting doubles/setup.
+2. Diagnose and repair at least four distinct test-quality problems spanning at least three diagnostic categories. Consider boundary/state coverage, assertions and invariants, setup ownership, doubles, persistence evidence, and test maintainability. Use facts and theories intentionally. Keep the suite compact and readable, with focused lifecycle unit tests and one intentional SQLite lifecycle component scenario.
+3. Run each repaired test independently, then run the complete suite at least twice consecutively and record both results. Verify consistent outcomes, independence from execution order, and resource cleanup. Keep databases and mutable test state owned by the tests that use them. Review the final diff for accidental production changes.
+4. Prepare the diagnosis and repair memo required by the Canvas assignment as a PDF or DOCX. Include the baseline/environment, diagnosis table, repair rationale, reproducible before-and-after evidence, and a 200–300-word technical reflection. Explain what your doubles prove and what your component test proves. Include one concrete example of a behavior error your repaired assertions would detect that the starter could miss. You may use `docs/test-review.md` as an optional drafting worksheet; it is not a separate required submission and does not replace the memo requirements in Canvas.
 
 Do not remove meaningful coverage, skip tests, disable all parallel execution, or weaken product rules to obtain green results. Production changes are not expected; raise a suspected contract conflict in your PR instead.
 
@@ -64,13 +64,22 @@ Do not remove meaningful coverage, skip tests, disable all parallel execution, o
 
 ```sh
 git remote -v
+git status --short
+git rev-parse HEAD
 git switch -c week5-test-repair
-# Make and verify your changes.
-git add tests docs/test-review.md
-git commit -m "Repair Week 5 test suite"
+```
+
+Commit related repairs separately with descriptive messages. After verifying each repair, stage only its related files and commit it. Avoid placing every repair into one unexplained commit. When your repairs and final verification are complete, push the branch:
+
+```sh
 git push -u origin week5-test-repair
 ```
 
 Open a pull request from `week5-test-repair` into `main` **within your assigned repository**. Leave it open for review; do not merge unless instructed. Include a summary of repaired problems and exact validation commands/results.
 
-Submit the PR URL, final commit SHA, repaired test/support files, and completed review worksheet. Include evidence of both full-suite and individual runs, with pass/fail/skip counts. Follow the course submission channel and deadline provided by your instructor.
+Submit these two items in Canvas:
+
+1. The URL of your open pull request.
+2. Your completed diagnosis and repair memo as a PDF or DOCX file.
+
+Keep repaired test/support files in the PR. Record the final commit SHA with your verification evidence, and include commands and pass/fail/skip counts for individual runs and both consecutive full-suite runs. Confirm that the instructor can access your repository and PR. The full memo requirements, grading criteria, and deadline appear in Canvas.
