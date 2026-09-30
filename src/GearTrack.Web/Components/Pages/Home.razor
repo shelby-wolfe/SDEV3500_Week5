@@ -1,0 +1,85 @@
+@page "/"
+@inject IGearTrackService GearTrackService
+
+<PageTitle>Dashboard | GearTrack</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Equipment operations</p>
+        <h1>Dashboard</h1>
+        <p class="subtitle">A current view of department inventory and checkout activity.</p>
+    </div>
+    <a class="button primary" href="/equipment">Browse equipment</a>
+</div>
+
+@if (summary is null)
+{
+    <p class="loading">Loading dashboard…</p>
+}
+else
+{
+    <section class="metric-grid" aria-label="Equipment summary">
+        <article class="metric-card total">
+            <span>Total equipment</span><strong>@summary.TotalEquipment</strong><small>Tracked assets</small>
+        </article>
+        <article class="metric-card available">
+            <span>Available</span><strong>@summary.Available</strong><small>Ready to reserve</small>
+        </article>
+        <article class="metric-card checked-out">
+            <span>Checked out</span><strong>@summary.CheckedOut</strong><small>Currently in use</small>
+        </article>
+        <article class="metric-card maintenance">
+            <span>Maintenance</span><strong>@summary.Maintenance</strong><small>Temporarily unavailable</small>
+        </article>
+        <article class="metric-card reservations">
+            <span>Upcoming</span><strong>@summary.UpcomingReservations</strong><small>Reservations scheduled</small>
+        </article>
+    </section>
+
+    <div class="dashboard-grid">
+        <section class="panel">
+            <div class="panel-heading">
+                <div><p class="eyebrow">Latest changes</p><h2>Recent activity</h2></div>
+                <a href="/reservations">View reservations</a>
+            </div>
+            <div class="activity-list">
+                @foreach (var entry in summary.RecentActivity)
+                {
+                    <a class="activity-row" href="@($"/equipment/{entry.EquipmentItemId}")">
+                        <span class="activity-icon" aria-hidden="true">@Icon(entry.Action)</span>
+                        <span class="activity-main"><strong>@entry.Action · @entry.EquipmentName</strong><small>@entry.Details</small></span>
+                        <time datetime="@entry.OccurredAt.ToString("O")">@RelativeDate(entry.OccurredAt)</time>
+                    </a>
+                }
+            </div>
+        </section>
+
+        <aside class="panel quick-panel">
+            <p class="eyebrow">Common tasks</p>
+            <h2>Quick actions</h2>
+            <a class="quick-link" href="/equipment"><span aria-hidden="true">⌕</span><span><strong>Find equipment</strong><small>Search inventory and check availability</small></span></a>
+            <a class="quick-link" href="/reservations"><span aria-hidden="true">✓</span><span><strong>Manage checkouts</strong><small>Check out or return reserved gear</small></span></a>
+            <a class="quick-link" href="/api/equipment"><span aria-hidden="true">{ }</span><span><strong>Equipment API</strong><small>Inspect the JSON endpoint</small></span></a>
+        </aside>
+    </div>
+}
+
+@code {
+    private DashboardSummary? summary;
+
+    protected override async Task OnInitializedAsync() => summary = await GearTrackService.GetDashboardAsync();
+
+    private static string Icon(string action) => action switch
+    {
+        "Returned" => "↩",
+        "Checked out" => "→",
+        "Maintenance" => "!",
+        _ => "◇"
+    };
+
+    private static string RelativeDate(DateTime value)
+    {
+        var date = value.ToLocalTime().Date;
+        return date == DateTime.Today ? "Today" : date == DateTime.Today.AddDays(-1) ? "Yesterday" : date.ToString("MMM d");
+    }
+}

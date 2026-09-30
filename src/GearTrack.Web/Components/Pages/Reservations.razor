@@ -1,0 +1,96 @@
+@page "/reservations"
+@inject IGearTrackService GearTrackService
+
+<PageTitle>Reservations | GearTrack</PageTitle>
+
+<div class="page-heading">
+    <div><p class="eyebrow">Circulation</p><h1>Reservations</h1><p class="subtitle">Review upcoming reservations, active checkouts, and completed activity.</p></div>
+    <a class="button primary" href="/equipment">New reservation</a>
+</div>
+
+@if (!string.IsNullOrWhiteSpace(message))
+{
+    <div class="alert @(succeeded ? "success" : "error")" role="status">@message</div>
+}
+
+<div class="tab-strip" role="tablist" aria-label="Reservation views">
+    <button class="@(view == "active" ? "active" : "")" @onclick="ShowActive">Active</button>
+    <button class="@(view == "history" ? "active" : "")" @onclick="ShowHistory">History</button>
+    <button class="@(view == "all" ? "active" : "")" @onclick="ShowAll">All</button>
+</div>
+
+@if (reservations is null)
+{
+    <p class="loading">Loading reservations…</p>
+}
+else
+{
+    var visible = VisibleReservations().ToList();
+    <div class="result-summary"><strong>@visible.Count</strong> reservations</div>
+    <section class="table-panel">
+        <div class="table-scroll">
+            <table>
+                <thead><tr><th>Equipment</th><th>Requester</th><th>Dates</th><th>Status</th><th><span class="visually-hidden">Actions</span></th></tr></thead>
+                <tbody>
+                    @foreach (var reservation in visible)
+                    {
+                        <tr>
+                            <td><a class="table-title" href="@($"/equipment/{reservation.EquipmentItemId}")">@reservation.EquipmentItem?.Name</a><small>@reservation.EquipmentItem?.AssetTag</small></td>
+                            <td><strong>@reservation.RequesterName</strong><small>@reservation.RequesterEmail</small></td>
+                            <td><strong>@reservation.StartDate.ToString("MMM d") – @reservation.EndDate.ToString("MMM d, yyyy")</strong><small>@reservation.Purpose</small></td>
+                            <td><span class="status @reservation.Status.ToString().ToLowerInvariant()">@DisplayStatus(reservation.Status)</span></td>
+                            <td class="actions">
+                                @if (reservation.Status == ReservationStatus.Reserved)
+                                {
+                                    <button class="button small secondary" @onclick="() => CheckOutAsync(reservation.Id)">Check out</button>
+                                }
+                                else if (reservation.Status == ReservationStatus.CheckedOut)
+                                {
+                                    <button class="button small primary" @onclick="() => ReturnAsync(reservation.Id)">Return</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </section>
+}
+
+@code {
+    private IReadOnlyList<Reservation>? reservations;
+    private string view = "active";
+    private string? message;
+    private bool succeeded;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+    private async Task LoadAsync() => reservations = await GearTrackService.GetReservationsAsync();
+    private void ShowActive() => view = "active";
+    private void ShowHistory() => view = "history";
+    private void ShowAll() => view = "all";
+
+    private IEnumerable<Reservation> VisibleReservations() => view switch
+    {
+        "active" => reservations!.Where(r => r.Status is ReservationStatus.Reserved or ReservationStatus.CheckedOut),
+        "history" => reservations!.Where(r => r.Status is ReservationStatus.Completed or ReservationStatus.Cancelled),
+        _ => reservations!
+    };
+
+    private async Task CheckOutAsync(int id)
+    {
+        var result = await GearTrackService.CheckOutAsync(id);
+        succeeded = result.Succeeded;
+        message = result.Message;
+        await LoadAsync();
+    }
+
+    private async Task ReturnAsync(int id)
+    {
+        var result = await GearTrackService.ReturnAsync(id);
+        succeeded = result.Succeeded;
+        message = result.Message;
+        await LoadAsync();
+    }
+
+    private static string DisplayStatus(ReservationStatus value) => value == ReservationStatus.CheckedOut ? "Checked out" : value.ToString();
+}

@@ -1,0 +1,17 @@
+@inherits LayoutComponentBase
+
+<div class="app-shell">
+    <header class="topbar">
+        <a class="brand" href="/" aria-label="GearTrack home">
+            <span class="brand-mark" aria-hidden="true">GT</span>
+            <span><strong>GearTrack</strong><small>Campus equipment checkout</small></span>
+        </a>
+        <NavMenu />
+    </header>
+    <main class="content">
+        @Body
+    </main>
+    <footer>
+        GearTrack learning environment · Local demonstration data only
+    </footer>
+</div>

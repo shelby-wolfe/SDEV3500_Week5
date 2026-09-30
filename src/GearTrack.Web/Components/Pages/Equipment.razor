@@ -1,0 +1,110 @@
+@page "/equipment"
+@inject IGearTrackService GearTrackService
+
+<PageTitle>Equipment | GearTrack</PageTitle>
+
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Inventory</p>
+        <h1>Equipment</h1>
+        <p class="subtitle">Find an asset, review its status, and create a reservation.</p>
+    </div>
+</div>
+
+<section class="filter-bar">
+    <div class="search-field">
+        <span aria-hidden="true">⌕</span>
+        <input placeholder="Search name, asset tag, manufacturer…" @bind="search" @bind:event="oninput" />
+    </div>
+    <label>Category
+        <select @bind="category">
+            <option value="">All categories</option>
+            @foreach (var option in categories)
+            {
+                <option value="@option">@option</option>
+            }
+        </select>
+    </label>
+    <label>Status
+        <select @bind="statusText">
+            <option value="">All statuses</option>
+            @foreach (var option in Enum.GetValues<EquipmentStatus>())
+            {
+                <option value="@option">@DisplayStatus(option)</option>
+            }
+        </select>
+    </label>
+    <button class="button primary" @onclick="LoadAsync">Apply filters</button>
+    <span class="text-action" @onclick="ClearAsync">Clear</span>
+</section>
+
+@if (items is null)
+{
+    <p class="loading">Loading equipment…</p>
+}
+else
+{
+    <div class="result-summary"><strong>@items.Count</strong> items found</div>
+    @if (items.Count == 0)
+    {
+        <section class="empty-state"><h2>No equipment found</h2><p>Try changing or clearing the current filters.</p></section>
+    }
+    else
+    {
+        <section class="equipment-grid" aria-label="Equipment results">
+            @foreach (var item in items)
+            {
+                <article class="equipment-card">
+                    <div class="equipment-visual @CategoryClass(item.Category)" aria-hidden="true">@CategoryIcon(item.Category)</div>
+                    <div class="equipment-body">
+                        <div class="card-topline"><span class="category">@item.Category</span><span class="status @StatusClass(item.Status)">@DisplayStatus(item.Status)</span></div>
+                        <h2><a href="@($"/equipment/{item.Id}")">@item.Name</a></h2>
+                        <p>@item.Manufacturer @item.Model</p>
+                        <dl class="compact-details">
+                            <div><dt>Asset tag</dt><dd>@item.AssetTag</dd></div>
+                            <div><dt>Location</dt><dd>@item.Location</dd></div>
+                        </dl>
+                        <a class="button secondary full" href="@($"/equipment/{item.Id}")">View details</a>
+                    </div>
+                </article>
+            }
+        </section>
+    }
+}
+
+@code {
+    private IReadOnlyList<EquipmentItem>? items;
+    private string search = "";
+    private string category = "";
+    private string statusText = "";
+    private readonly string[] categories = ["Adapters", "Audio", "Cameras", "Laptops", "Lighting", "Projectors", "Supports", "Tablets"];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        EquipmentStatus? parsed = Enum.TryParse<EquipmentStatus>(statusText, out var value) ? value : null;
+        items = await GearTrackService.BrowseEquipmentAsync(new EquipmentFilter(search, category, parsed));
+    }
+
+    private async Task ClearAsync()
+    {
+        search = category = statusText = "";
+        await LoadAsync();
+    }
+
+    private static string DisplayStatus(EquipmentStatus value) => value == EquipmentStatus.CheckedOut ? "Checked out" : value.ToString();
+    private static string StatusClass(EquipmentStatus value) => value.ToString().ToLowerInvariant();
+    private static string CategoryClass(string value) => value.ToLowerInvariant();
+    private static string CategoryIcon(string category) => category switch
+    {
+        "Laptops" => "▱",
+        "Cameras" => "◉",
+        "Audio" => "⌁",
+        "Projectors" => "▰",
+        "Tablets" => "▯",
+        "Lighting" => "✦",
+        "Supports" => "△",
+        _ => "⌘"
+    };
+}

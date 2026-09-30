@@ -1,0 +1,136 @@
+@page "/equipment/{Id:int}"
+@inject IGearTrackService GearTrackService
+
+<PageTitle>@(item is null ? "Equipment" : item.Name) | GearTrack</PageTitle>
+
+@if (item is null)
+{
+    <p class="loading">Loading equipment details…</p>
+}
+else
+{
+    <a class="back-link" href="/equipment">← Back to equipment</a>
+    <div class="detail-header">
+        <div class="detail-icon" aria-hidden="true">@CategoryIcon(item.Category)</div>
+        <div>
+            <div class="card-topline"><span class="category">@item.Category</span><span class="status @StatusClass(item.Status)">@DisplayStatus(item.Status)</span></div>
+            <h1>@item.Name</h1>
+            <p class="subtitle">@item.Manufacturer @item.Model · @item.AssetTag</p>
+        </div>
+    </div>
+
+    <div class="detail-grid">
+        <div>
+            <section class="panel detail-panel">
+                <p class="eyebrow">Asset record</p><h2>Equipment details</h2>
+                <p>@item.Description</p>
+                <dl class="detail-list">
+                    <div><dt>Asset tag</dt><dd>@item.AssetTag</dd></div>
+                    <div><dt>Manufacturer</dt><dd>@item.Manufacturer</dd></div>
+                    <div><dt>Model</dt><dd>@item.Model</dd></div>
+                    <div><dt>Storage location</dt><dd>@item.Location</dd></div>
+                    <div><dt>Purchased</dt><dd>@item.PurchasedOn.ToString("MMM d, yyyy")</dd></div>
+                </dl>
+            </section>
+
+            <section class="panel detail-panel">
+                <p class="eyebrow">Audit trail</p><h2>Equipment history</h2>
+                @if (history is null || history.Count == 0)
+                {
+                    <p class="muted">No recorded activity for this item.</p>
+                }
+                else
+                {
+                    <div class="timeline">
+                        @foreach (var entry in history)
+                        {
+                            <div class="timeline-item"><span></span><div><strong>@entry.Action</strong><p>@entry.Details</p><time>@entry.OccurredAt.ToLocalTime().ToString("MMM d, yyyy · h:mm tt")</time></div></div>
+                        }
+                    </div>
+                }
+            </section>
+        </div>
+
+        <aside>
+            <section class="panel reservation-panel">
+                <p class="eyebrow">Schedule equipment</p><h2>Create reservation</h2>
+                @if (!string.IsNullOrWhiteSpace(message))
+                {
+                    <div class="alert @(succeeded ? "success" : "error")" role="status">@message</div>
+                }
+                <div class="form-grid">
+                    <label>Your name <input @bind="form.RequesterName" /></label>
+                    <label>Email <input type="email" @bind="form.RequesterEmail" /></label>
+                    <label>Purpose <textarea rows="3" @bind="form.Purpose"></textarea></label>
+                    <div class="date-row">
+                        <label>Start date <input type="date" @bind="form.StartDate" /></label>
+                        <label>End date <input type="date" @bind="form.EndDate" /></label>
+                    </div>
+                    <button class="button primary full" @onclick="ReserveAsync" disabled="@saving">@(saving ? "Saving…" : "Create reservation")</button>
+                </div>
+            </section>
+
+            <section class="panel schedule-panel">
+                <p class="eyebrow">Availability</p><h2>Current schedule</h2>
+                @if (reservations is null || reservations.Count == 0)
+                {
+                    <p class="muted">No upcoming reservations.</p>
+                }
+                else
+                {
+                    @foreach (var reservation in reservations)
+                    {
+                        <div class="schedule-row"><strong>@reservation.StartDate.ToString("MMM d") – @reservation.EndDate.ToString("MMM d")</strong><span>@reservation.RequesterName</span><small>@reservation.Status</small></div>
+                    }
+                }
+            </section>
+        </aside>
+    </div>
+}
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private EquipmentItem? item;
+    private IReadOnlyList<ActivityView>? history;
+    private IReadOnlyList<Reservation>? reservations;
+    private ReservationForm form = new();
+    private bool saving;
+    private bool succeeded;
+    private string? message;
+
+    protected override async Task OnParametersSetAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        item = await GearTrackService.GetEquipmentAsync(Id);
+        if (item is null) return;
+        history = await GearTrackService.GetEquipmentHistoryAsync(Id);
+        reservations = (await GearTrackService.GetReservationsAsync())
+            .Where(r => r.EquipmentItemId == Id && r.Status is ReservationStatus.Reserved or ReservationStatus.CheckedOut)
+            .OrderBy(r => r.StartDate).ToList();
+    }
+
+    private async Task ReserveAsync()
+    {
+        saving = true;
+        var request = new ReservationRequest(Id, form.RequesterName, form.RequesterEmail, form.Purpose, form.StartDate, form.EndDate);
+        var result = await GearTrackService.CreateReservationAsync(request);
+        succeeded = result.Result.Succeeded;
+        message = result.Result.Message;
+        saving = false;
+        await LoadAsync();
+    }
+
+    private static string DisplayStatus(EquipmentStatus value) => value == EquipmentStatus.CheckedOut ? "Checked out" : value.ToString();
+    private static string StatusClass(EquipmentStatus value) => value.ToString().ToLowerInvariant();
+    private static string CategoryIcon(string category) => category switch { "Laptops" => "▱", "Cameras" => "◉", "Audio" => "⌁", "Projectors" => "▰", "Tablets" => "▯", "Lighting" => "✦", "Supports" => "△", _ => "⌘" };
+
+    private sealed class ReservationForm
+    {
+        public string RequesterName { get; set; } = "";
+        public string RequesterEmail { get; set; } = "";
+        public string Purpose { get; set; } = "";
+        public DateTime StartDate { get; set; } = DateTime.Today.AddDays(1);
+        public DateTime EndDate { get; set; } = DateTime.Today.AddDays(2);
+    }
+}

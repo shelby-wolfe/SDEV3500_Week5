@@ -1,0 +1,10 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/GearTrack.Core/GearTrack.Core.csproj" />
+    <Project Path="src/GearTrack.Infrastructure/GearTrack.Infrastructure.csproj" />
+    <Project Path="src/GearTrack.Web/GearTrack.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GearTrack.Core.Tests/GearTrack.Core.Tests.csproj" />
+  </Folder>
+</Solution>

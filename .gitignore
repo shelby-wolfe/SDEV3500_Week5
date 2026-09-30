@@ -1,0 +1,13 @@
+**/bin/
+**/obj/
+**/TestResults/
+**/StrykerOutput/
+*.trx
+*.coverage
+*.coveragexml
+*.db
+*.db-shm
+*.db-wal
+.DS_Store
+.vs/
+.idea/
