@@ -12,25 +12,83 @@ public class PersistenceTests
     [Fact]
     public async Task Reservation_lifecycle_is_persisted()
     {
-        using var connection = new SqliteConnection("Data Source=:memory:");
+        await using var connection = new SqliteConnection("Data Source=:memory:");
         await connection.OpenAsync();
-        var options = new DbContextOptionsBuilder<GearTrackDbContext>().UseSqlite(connection).Options;
-        await using var context = new GearTrackDbContext(options);
-        await context.Database.EnsureCreatedAsync();
-        var equipment = new EquipmentItem { AssetTag = "LAB-03", Name = "Tripod", Category = "Video" };
-        context.Equipment.Add(equipment);
-        await context.SaveChangesAsync();
-        var service = new GearTrackService(new GearTrackRepository(context));
-        var created = await service.CreateReservationAsync(new ReservationRequest(equipment.Id, "Sample Borrower", "borrower@example.test", "Video practice", new DateTime(2030, 4, 12), new DateTime(2030, 4, 13)));
-        Assert.True(created.Result.Succeeded);
-        var id = created.Reservation!.Id;
-        await service.CheckOutAsync(id);
-        await service.ReturnAsync(id);
 
-        var stored = await context.Reservations.FindAsync(id);
-        var storedEquipment = await context.Equipment.FindAsync(equipment.Id);
-        Assert.Equal(ReservationStatus.Completed, stored!.Status);
-        Assert.Equal(EquipmentStatus.Available, storedEquipment!.Status);
-        Assert.Equal(3, context.Activity.Local.Count);
+        var options = new DbContextOptionsBuilder<GearTrackDbContext>()
+            .UseSqlite(connection)
+            .Options;
+
+        int equipmentId;
+        int reservationId;
+
+        await using (var writeContext = new GearTrackDbContext(options))
+        {
+            await writeContext.Database.EnsureCreatedAsync();
+
+            var equipment = new EquipmentItem
+            {
+                AssetTag = "LAB-03",
+                Name = "Tripod",
+                Category = "Video"
+            };
+
+            writeContext.Equipment.Add(equipment);
+            await writeContext.SaveChangesAsync();
+            equipmentId = equipment.Id;
+
+            var service = new GearTrackService(
+                new GearTrackRepository(writeContext));
+
+            var created = await service.CreateReservationAsync(
+                new ReservationRequest(
+                    equipmentId,
+                    "Sample Borrower",
+                    "borrower@example.test",
+                    "Video practice",
+                    new DateTime(2030, 4, 12),
+                    new DateTime(2030, 4, 13)));
+
+            Assert.True(created.Result.Succeeded);
+            reservationId = created.Reservation!.Id;
+
+            var checkout = await service.CheckOutAsync(reservationId);
+            Assert.True(checkout.Succeeded);
+
+            var returned = await service.ReturnAsync(reservationId);
+            Assert.True(returned.Succeeded);
+        }
+
+        await using (var readContext = new GearTrackDbContext(options))
+        {
+            var storedReservation = await readContext.Reservations
+                .AsNoTracking()
+                .SingleAsync(r => r.Id == reservationId);
+
+            var storedEquipment = await readContext.Equipment
+                .AsNoTracking()
+                .SingleAsync(e => e.Id == equipmentId);
+
+            var activities = await readContext.Activity
+                .AsNoTracking()
+                .Where(a => a.ReservationId == reservationId)
+                .OrderBy(a => a.Id)
+                .ToListAsync();
+
+            Assert.Equal(ReservationStatus.Completed, storedReservation.Status);
+            Assert.Equal(EquipmentStatus.Available, storedEquipment.Status);
+            Assert.NotNull(storedReservation.CheckedOutAt);
+            Assert.NotNull(storedReservation.ReturnedAt);
+
+            Assert.Collection(
+                activities,
+                activity => Assert.Equal("Reserved", activity.Action),
+                activity => Assert.Equal("Checked out", activity.Action),
+                activity => Assert.Equal("Returned", activity.Action));
+
+            Assert.All(
+                activities,
+                activity => Assert.Equal(equipmentId, activity.EquipmentItemId));
+        }
     }
 }

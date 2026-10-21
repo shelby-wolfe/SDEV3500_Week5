@@ -6,31 +6,91 @@ namespace GearTrack.Core.Tests;
 public class LifecycleTests
 {
     [Theory]
+    [InlineData(ReservationStatus.CheckedOut)]
     [InlineData(ReservationStatus.Completed)]
-    public async Task Checkout_rejects_invalid_status(ReservationStatus status)
+    public async Task Checkout_rejects_invalid_status(
+    ReservationStatus status)
     {
         var repository = new StarterRepository();
-        var equipment = new EquipmentItem { Id = 1, AssetTag = "LAB-01", Name = "Field recorder", Category = "Audio" };
+        var equipment = new EquipmentItem
+        {
+            Id = 1,
+            AssetTag = "LAB-01",
+            Name = "Field recorder",
+            Category = "Audio"
+        };
+
         repository.Equipment.Add(equipment);
-        var reservation = new Reservation { EquipmentItemId = 1, RequesterName = "Sample Borrower", RequesterEmail = "borrower@example.test", Purpose = "Field recording", StartDate = new DateTime(2030, 4, 12), EndDate = new DateTime(2030, 4, 13), Status = status };
+
+        var reservation = new Reservation
+        {
+            EquipmentItemId = 1,
+            RequesterName = "Sample Borrower",
+            RequesterEmail = "borrower@example.test",
+            Purpose = "Field recording",
+            StartDate = new DateTime(2030, 4, 12),
+            EndDate = new DateTime(2030, 4, 13),
+            Status = status
+        };
+
         repository.AddReservation(reservation);
         var service = new GearTrackService(repository);
+
+        var originalEquipmentStatus = equipment.Status;
+        var originalActivityCount = repository.SavedActivity.Count;
+        var originalSaveCount = repository.SaveChangesCallCount;
+
         var result = await service.CheckOutAsync(reservation.Id);
+
         Assert.False(result.Succeeded);
+        Assert.Equal(status, reservation.Status);
+        Assert.Equal(originalEquipmentStatus, equipment.Status);
+        Assert.Equal(originalActivityCount, repository.SavedActivity.Count);
+        Assert.Equal(originalSaveCount, repository.SaveChangesCallCount);
     }
 
     [Theory]
+    [InlineData(ReservationStatus.Reserved)]
     [InlineData(ReservationStatus.Completed)]
-    public async Task Return_rejects_invalid_status(ReservationStatus status)
+    public async Task Return_rejects_invalid_status(
+        ReservationStatus status)
     {
         var repository = new StarterRepository();
-        var equipment = new EquipmentItem { Id = 1, AssetTag = "LAB-01", Name = "Field recorder", Category = "Audio" };
+        var equipment = new EquipmentItem
+        {
+            Id = 1,
+            AssetTag = "LAB-01",
+            Name = "Field recorder",
+            Category = "Audio"
+        };
+
         repository.Equipment.Add(equipment);
-        var reservation = new Reservation { EquipmentItemId = 1, RequesterName = "Sample Borrower", RequesterEmail = "borrower@example.test", Purpose = "Field recording", StartDate = new DateTime(2030, 4, 12), EndDate = new DateTime(2030, 4, 13), Status = status };
+
+        var reservation = new Reservation
+        {
+            EquipmentItemId = 1,
+            RequesterName = "Sample Borrower",
+            RequesterEmail = "borrower@example.test",
+            Purpose = "Field recording",
+            StartDate = new DateTime(2030, 4, 12),
+            EndDate = new DateTime(2030, 4, 13),
+            Status = status
+        };
+
         repository.AddReservation(reservation);
         var service = new GearTrackService(repository);
+
+        var originalEquipmentStatus = equipment.Status;
+        var originalActivityCount = repository.SavedActivity.Count;
+        var originalSaveCount = repository.SaveChangesCallCount;
+
         var result = await service.ReturnAsync(reservation.Id);
+
         Assert.False(result.Succeeded);
+        Assert.Equal(status, reservation.Status);
+        Assert.Equal(originalEquipmentStatus, equipment.Status);
+        Assert.Equal(originalActivityCount, repository.SavedActivity.Count);
+        Assert.Equal(originalSaveCount, repository.SaveChangesCallCount);
     }
 
     [Theory]

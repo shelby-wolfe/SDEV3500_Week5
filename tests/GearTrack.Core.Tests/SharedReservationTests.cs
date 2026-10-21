@@ -3,34 +3,62 @@ using GearTrack.Core.Services;
 
 namespace GearTrack.Core.Tests;
 
-public sealed class ReservationFixture
+public class SharedReservationTests
 {
-    public StarterRepository Repository { get; } = new();
-    public Reservation Reservation { get; }
-    public GearTrackService Service { get; }
-
-    public ReservationFixture()
+    private static (StarterRepository Repository, Reservation Reservation, GearTrackService Service)
+        CreateFixture()
     {
-        Repository.Equipment.Add(new EquipmentItem { Id = 1, AssetTag = "LAB-02", Name = "Camera", Category = "Video" });
-        Reservation = new Reservation { EquipmentItemId = 1, RequesterName = "Sample Borrower", RequesterEmail = "borrower@example.test", Purpose = "Video practice", StartDate = new DateTime(2030, 4, 12), EndDate = new DateTime(2030, 4, 13) };
-        Repository.AddReservation(Reservation);
-        Service = new GearTrackService(Repository);
-    }
-}
+        var repository = new StarterRepository();
 
-public class SharedReservationTests(ReservationFixture fixture) : IClassFixture<ReservationFixture>
-{
+        repository.Equipment.Add(new EquipmentItem
+        {
+            Id = 1,
+            AssetTag = "LAB-02",
+            Name = "Camera",
+            Category = "Video"
+        });
+
+        var reservation = new Reservation
+        {
+            EquipmentItemId = 1,
+            RequesterName = "Sample Borrower",
+            RequesterEmail = "borrower@example.test",
+            Purpose = "Video practice",
+            StartDate = new DateTime(2030, 4, 12),
+            EndDate = new DateTime(2030, 4, 13)
+        };
+
+        repository.AddReservation(reservation);
+
+        var service = new GearTrackService(repository);
+
+        return (repository, reservation, service);
+    }
+
     [Fact]
     public async Task Checkout_provides_feedback()
     {
-        var result = await fixture.Service.CheckOutAsync(fixture.Reservation.Id);
+        var (_, reservation, service) = CreateFixture();
+
+        var result = await service.CheckOutAsync(reservation.Id);
+
+        Assert.True(result.Succeeded);
         Assert.False(string.IsNullOrWhiteSpace(result.Message));
     }
 
     [Fact]
     public async Task Checkout_records_activity()
     {
-        await fixture.Service.CheckOutAsync(fixture.Reservation.Id);
-        Assert.Contains(fixture.Repository.SavedActivity, entry => entry.Action == "Checked out");
+        var (repository, reservation, service) = CreateFixture();
+
+        var result = await service.CheckOutAsync(reservation.Id);
+
+        Assert.True(result.Succeeded);
+
+        var activity = Assert.Single(repository.SavedActivity);
+        Assert.Equal("Checked out", activity.Action);
+        Assert.Equal(reservation.Id, activity.ReservationId);
+        Assert.Equal(reservation.EquipmentItemId, activity.EquipmentItemId);
+        Assert.Equal(ReservationStatus.CheckedOut, reservation.Status);
     }
 }
